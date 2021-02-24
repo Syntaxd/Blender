@@ -1,3 +1,51 @@
+import random
+import math
+
+def points(size):
+    num_points = 3
+    threshold = .3
+
+
+    def dist(p1, p2):
+        return math.sqrt(math.pow(p1[0]-p2[0], 2) + math.pow(p1[1] - p2[1], 2))
+
+
+    final_list = []
+    while len(final_list) < num_points:
+        count = 0
+        while True:
+            count += 1
+
+            if count > 10000:
+                raise Exception('Can\'t generate any more points')
+            point = [random.random(), random.random()]
+
+            if not len(final_list):
+                # First point
+                final_list.append(point)
+            else:
+                # Check if it is too close to any other points
+                valid = True
+                for p in final_list:
+
+                    d1 = dist(p, point)
+                    if d1 < threshold:
+                        valid = False
+                        break
+
+                if valid:
+                    final_list.append(point)
+                    break
+
+
+    print('================================')
+    print('FIANL LIST')
+    for x in final_list:
+        x[0]*=size
+        x[1]*=size
+    print(x)
+    return final_list
+
 import numpy as np
 
 def interpolant(t):
@@ -88,47 +136,33 @@ def generate_fractal_noise_2d(
         amplitude *= persistence
     return noise
 
-
-def generate_old_landscape():
-    p = generate_fractal_noise_2d((256, 256), (8, 8), 5)
-
-    import time
-    import bpy
-    rx = 2
-    ry = 2
-    file_loc = '/Users/ryan/Projects/3db/Grass/Gen.obj'
-    for x in range(rx):
-        for y in range(ry):
-            start_time = time.time()
-            h = p[x][y]
-            if y < 1 and x < 1:
-                imported_object = bpy.ops.import_scene.obj(filepath=file_loc)
-            else:
-                bpy.ops.object.duplicate()
-            block = bpy.context.selected_objects[0]
-            block.location = (x*2,y*2,h*10)
-
-            print('Imported ground block: ' + block.name + ' at ' +str(x)+', '+str(y)+', ' + str(round(h, 2)) + "\n", end='', flush=True)
+def generate_gaussian(shape, x_center=100, y_center=100, height=10, sigma=5000):
+    import math
+    p = np.zeros(shape)
+    for x in range(0, shape[0]):
+        for y in range(0, shape[1]):
+            p[x,y] = p[x,y] + height * math.exp(
+                -((x-x_center)*(x-x_center) + (y-y_center)*(y-y_center))/sigma
+            )
+    return p
 
 
-#bpy.ops.mesh.primitive_grid_add(
-#    x_subdivisions=10,
-#    y_subdivisions=10,
-#    size=2.0,
-#    calc_uvs=True,
-#    enter_editmode=False,
-#    align='WORLD',
-#    location=(0.0, 0.0, 0.0),
-#    rotation=(0.0, 0.0, 0.0),
-#    scale=(0.0, 0.0, 0.0)
-#)
+def add_gaussian(p, x_center=100, y_center=100, height=10, sigma=5000):
+    import math
+    shape = p.shape
+
+    for x in range(0, shape[0]):
+        for y in range(0, shape[1]):
+            p[x,y] = p[x,y] + height * math.exp(
+                -((x-x_center)*(x-x_center) + (y-y_center)*(y-y_center))/sigma
+            )
+
+
 def create_grid(p, scale):
     import time
     import bpy
 
     print("-" * 33)
-    print(p.shape)
-    print(p)
     i, j = p.shape
 
     bpy.ops.mesh.primitive_grid_add(
@@ -139,34 +173,58 @@ def create_grid(p, scale):
     )
 
     grid = bpy.context.object
-
     for v in grid.data.vertices:
         v.co.z = scale * p[v.index // i][v.index % j]
 
-
-def add_gaussian(p, x_center=100, y_center=100, height=10, sigma=5000):
-    import math
-    shape = p.shape
-    print(shape)
-    for x in range(0, shape[0]):
-        for y in range(0, shape[1]):
-#            print(x, y, math.exp(-(x-x_center)*(x-x_center) + (y-y_center)*(y-y_center)/sigma))
-#            print(x, y, math.exp(-(x-x_center)*(x-x_center) + (y-y_center)*(y-y_center)/sigma))
-            p[x,y] = p[x,y] + height * math.exp(
-                -((x-x_center)*(x-x_center) + (y-y_center)*(y-y_center))/sigma
-            )
 
 def generate_landscape():
     shape = (512, 512)
 #    p = generate_fractal_noise_2d(shape, (8, 8), 5)
 
-    res = (8, 8)
     scale = 0.25
-    p = generate_perlin_noise_2d(
-        shape, res, tileable=(True, True), interpolant=interpolant)
 
-    add_gaussian(p, x_center=200, y_center=200, height=10, sigma=5000)
-    add_gaussian(p, x_center=400, y_center=400, height=5, sigma=1000)
+    res_2 = (64, 64)
+    p_2 = generate_perlin_noise_2d(
+        shape, res_2, tileable=(True, True), interpolant=interpolant)
+    p_2 = p_2 * 0.25
+
+    res_1 = (32, 32)
+    p_1 = generate_perlin_noise_2d(
+        shape, res_1, tileable=(True, True), interpolant=interpolant)
+    p_1 = p_1 * 0.5
+
+    res0 = (16, 16)
+    p0 = generate_perlin_noise_2d(
+        shape, res0, tileable=(True, True), interpolant=interpolant)
+    p0 = p0 * 1
+
+    res1 = (8, 8)
+    p1 = generate_perlin_noise_2d(
+        shape, res1, tileable=(True, True), interpolant=interpolant)
+    p1 = p1 * 2
+
+    res2 = (4, 4)
+    p2 = generate_perlin_noise_2d(
+        shape, res2, tileable=(True, True), interpolant=interpolant)
+    p2 = p2 * 4
+
+    res3 = (2, 2)
+    p3 = generate_perlin_noise_2d(
+        shape, res3, tileable=(True, True), interpolant=interpolant)
+    p3 = p3 * 8
+
+
+    g = np.zeros(shape)
+    gau_list = points(512)
+    print(gau_list)
+    for gau in gau_list:
+        print(gau)
+        g+=generate_gaussian(shape, x_center=gau[0], y_center=gau[1], height=20, sigma=15000)
+
+    p = p3 + p2 + p1 + p0 + p_1 + p_2 + g
+
+    # add_gaussian(p, x_center=200, y_center=200, height=10, sigma=5000)
+    # add_gaussian(p, x_center=400, y_center=400, height=5, sigma=1000)
     create_grid(p, scale)
 
 
